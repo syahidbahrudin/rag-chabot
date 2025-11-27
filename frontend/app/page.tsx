@@ -3,7 +3,7 @@ import AdminPanel from "../components/AdminPanel";
 
 export default function Page() {
   return (
-    <div className="h-screen w-screen flex flex-col bg-neutral-950 overflow-hidden">
+    <div className="h-screen w-screen flex flex-col  overflow-hidden">
       <AdminPanel />
       <Chat />
     </div>

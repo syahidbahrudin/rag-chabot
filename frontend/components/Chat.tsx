@@ -95,8 +95,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#343541] overflow-hidden">
-      {/* Messages Container */}
+    <div className="flex flex-col h-screen  overflow-hidden">
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-8">
           {messages.length === 0 && (
@@ -112,7 +111,6 @@ export default function Chat() {
                 m.role === "user" ? "justify-end" : "justify-start"
               }`}
             >
-              {/* Message Content */}
               <div
                 className={`${
                   m.role === "user"
@@ -217,7 +215,7 @@ export default function Chat() {
                     {m.citations.map((c, idx) => (
                       <span
                         key={idx}
-                        className="bg-[#2a2a2a] text-gray-300 px-2 py-1 rounded-full text-xs border border-[#3a3a3a]"
+                        className="bg-[#2a2a2a] text-gray-300 px-2 py-1 rounded-full text-xs border border-zinc-700"
                         title={c.section || ""}
                       >
                         {c.title}
@@ -231,9 +229,6 @@ export default function Chat() {
 
           {loading && (
             <div className="flex gap-4 mb-6 justify-start">
-              {/* <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#19c37d] flex items-center justify-center text-white font-semibold text-sm">
-                  AI
-                </div> */}
               <div className="text-gray-400 italic">Thinking...</div>
             </div>
           )}
@@ -242,10 +237,9 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Input Bar */}
       <div className="">
         <div className="max-w-3xl mx-auto px-4 py-4">
-          <div className="relative flex items-center bg-[#40414f] rounded-2xl border border-[#565869] shadow-lg">
+          <div className="relative flex items-center bg-neutral-800 rounded-2xl border border-zinc-700 shadow-lg">
             <input
               type="text"
               placeholder="Ask anything"
@@ -257,13 +251,17 @@ export default function Chat() {
                   send();
                 }
               }}
-              className="flex-1 bg-transparent text-white placeholder-gray-400 ml-3 px-2 py-3 outline-none resize-none"
+              className="flex-1 bg-transparent text-white placeholder-gray-400 ml-3 px-2 py-4 outline-none resize-none"
             />
-            <button>{"->"}</button>
+            <button
+              className="bg-white rounded-xl p-2 mr-3 cursor-pointer"
+              onClick={send}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                <path d="M7 7h8.586L5.293 17.293l1.414 1.414L17 8.414V17h2V5H7v2z" />
+              </svg>
+            </button>
           </div>
-          <p className="text-xs text-gray-500 text-center mt-2">
-            AI can make mistakes. Check important info.
-          </p>
         </div>
       </div>
     </div>
