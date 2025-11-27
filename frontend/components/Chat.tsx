@@ -13,6 +13,7 @@ type Message = {
 export default function Chat() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [q, setQ] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -21,15 +22,20 @@ export default function Chat() {
   };
 
   React.useEffect(() => {
+    if (!isSubmitting) return;
     scrollToBottom();
-  }, [messages, loading]);
+  }, [isSubmitting]);
 
-  const send = async () => {
-    if (!q.trim()) return;
-    const my = { role: "user" as const, content: q };
+  const send = async (question?: string) => {
+    if (loading) return;
+    setIsSubmitting(true);
+    const questionToSend = question || q;
+    if (!questionToSend.trim()) {
+      return;
+    }
+    const my = { role: "user" as const, content: questionToSend };
     setMessages((m) => [...m, my]);
     setLoading(true);
-
     // Create a placeholder message for streaming
     const aiMessage: Message = {
       role: "assistant",
@@ -40,7 +46,7 @@ export default function Chat() {
 
     try {
       await apiAskStream(
-        q,
+        questionToSend,
         4,
         (chunk: string) => {
           // Update the last message with new chunk
@@ -91,6 +97,7 @@ export default function Chat() {
       setLoading(false);
     } finally {
       setQ("");
+      setIsSubmitting(false);
     }
   };
 
@@ -233,12 +240,34 @@ export default function Chat() {
             </div>
           )}
 
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-[66dvh]" />
         </div>
       </div>
 
       <div className="">
         <div className="max-w-3xl mx-auto px-4 py-4">
+          <div className=" flex flex-row gap-5 mb-5">
+            <button
+              className="bg-neutral-800 rounded-2xl border border-zinc-700 shadow-lg p-2 text-white cursor-pointer"
+              disabled={loading}
+              onClick={() => {
+                send("Can a customer return a damaged blender after 20 days?");
+              }}
+            >
+              Can a customer return a damaged blender after 20 days?
+            </button>
+            <button
+              className="bg-neutral-800 rounded-2xl border border-zinc-700 shadow-lg p-2 text-white cursor-pointer"
+              disabled={loading}
+              onClick={() => {
+                send(
+                  "What's the shipping SLA to East Malaysia for bulky items?"
+                );
+              }}
+            >
+              What's the shipping SLA to East Malaysia for bulky items?
+            </button>
+          </div>
           <div className="relative flex items-center bg-neutral-800 rounded-2xl border border-zinc-700 shadow-lg">
             <input
               type="text"
@@ -255,7 +284,8 @@ export default function Chat() {
             />
             <button
               className="bg-white rounded-xl p-2 mr-3 cursor-pointer"
-              onClick={send}
+              onClick={() => send()}
+              disabled={loading}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
                 <path d="M7 7h8.586L5.293 17.293l1.414 1.414L17 8.414V17h2V5H7v2z" />
