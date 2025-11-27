@@ -9,11 +9,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: 24 }}>
-          {children}
-        </div>
-      </body>
+      <body className=" antialiased">{children}</body>
     </html>
   );
 }

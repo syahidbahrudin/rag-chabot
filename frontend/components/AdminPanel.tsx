@@ -26,38 +26,88 @@ export default function AdminPanel() {
   }, []);
 
   return (
-    <div className="card">
-      <h2>Admin</h2>
-      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-        <button
-          onClick={ingest}
-          disabled={busy}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #111",
-            background: "#fff",
-          }}
-        >
-          {busy ? "Indexing..." : "Ingest sample docs"}
-        </button>
-        <button
-          onClick={refresh}
-          style={{
-            padding: "8px 12px",
-            borderRadius: 8,
-            border: "1px solid #111",
-            background: "#fff",
-          }}
-        >
-          Refresh metrics
-        </button>
-      </div>
-      {metrics && (
-        <div className="code">
-          <pre>{JSON.stringify(metrics, null, 2)}</pre>
+    <div style={{
+      position: "fixed",
+      top: 16,
+      right: 16,
+      zIndex: 1000,
+      minWidth: 280,
+      maxWidth: 400,
+    }}>
+      <div className="card" style={{
+        background: "#000000",
+        border: "1px solid #2a2a2a",
+        padding: 12,
+      }}>
+        <h2 style={{ 
+          marginTop: 0, 
+          marginBottom: 12,
+          fontSize: 16,
+          color: "#ffffff"
+        }}>
+          Admin
+        </h2>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+          <button
+            onClick={ingest}
+            disabled={busy}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 6,
+              border: "1px solid #2a2a2a",
+              background: busy ? "#1a1a1a" : "#2a2a2a",
+              color: "#ffffff",
+              cursor: busy ? "not-allowed" : "pointer",
+              fontWeight: 500,
+              fontSize: 13,
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              if (!busy) {
+                e.currentTarget.style.background = "#3a3a3a";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!busy) {
+                e.currentTarget.style.background = "#2a2a2a";
+              }
+            }}
+          >
+            {busy ? "Indexing..." : "Ingest sample docs"}
+          </button>
+          <button
+            onClick={refresh}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 6,
+              border: "1px solid #2a2a2a",
+              background: "#2a2a2a",
+              color: "#ffffff",
+              cursor: "pointer",
+              fontWeight: 500,
+              fontSize: 13,
+              transition: "background 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#3a3a3a";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#2a2a2a";
+            }}
+          >
+            Refresh metrics
+          </button>
         </div>
-      )}
+        {metrics && (
+          <div className="code" style={{
+            maxHeight: 200,
+            overflowY: "auto",
+            fontSize: 11,
+          }}>
+            <pre style={{ margin: 0, color: "#e5e5e5" }}>{JSON.stringify(metrics, null, 2)}</pre>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

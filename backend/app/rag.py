@@ -52,8 +52,8 @@ class InMemoryStore:
         return [(float(sims[i]), self.meta[i]) for i in idx]
 
 class QdrantStore:
-    def __init__(self, collection: str, dim: int = 384):
-        self.client = QdrantClient(url="http://qdrant:6333", timeout=10.0)
+    def __init__(self, collection: str, dim: int = 384, url: str = "http://localhost:6333"):
+        self.client = QdrantClient(url=url, timeout=10.0)
         self.collection = collection
         self.dim = dim
         self._ensure_collection()
@@ -70,14 +70,30 @@ class QdrantStore:
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
         points = []
         for i, (v, m) in enumerate(zip(vectors, metadatas)):
-            points.append(qm.PointStruct(id=m.get("id") or m.get("hash") or i, vector=v.tolist(), payload=m))
+            # Qdrant requires point IDs to be either unsigned integers or UUIDs
+            # Convert hash string to integer if present, otherwise use index
+            point_id = i
+            if m.get("id"):
+                # Convert hex string to integer (use first 16 chars = 64 bits)
+                try:
+                    point_id = int(m.get("id")[:16], 16)
+                except (ValueError, TypeError):
+                    point_id = i
+            elif m.get("hash"):
+                # Convert hex string to integer (use first 16 chars = 64 bits)
+                try:
+                    point_id = int(m.get("hash")[:16], 16)
+                except (ValueError, TypeError):
+                    point_id = i
+            points.append(qm.PointStruct(id=point_id, vector=v.tolist(), payload=m))
         self.client.upsert(collection_name=self.collection, points=points)
 
-    def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
+    def search(self, query: np.ndarray, k: int = 1) -> List[Tuple[float, Dict]]:
         res = self.client.search(
             collection_name=self.collection,
             query_vector=query.tolist(),
             limit=k,
+            score_threshold=0.9,
             with_payload=True
         )
         out = []
@@ -88,15 +104,34 @@ class QdrantStore:
 # ---- LLM provider ----
 class StubLLM:
     def generate(self, query: str, contexts: List[Dict]) -> str:
-        lines = [f"Answer (stub): Based on the following sources:"]
-        for c in contexts:
-            sec = c.get("section") or "Section"
-            lines.append(f"- {c.get('title')} — {sec}")
-        lines.append("Summary:")
-        # naive summary of top contexts
-        joined = " ".join([c.get("text", "") for c in contexts])
-        lines.append(joined[:600] + ("..." if len(joined) > 600 else ""))
+        lines = [
+            f"Hi! I'd be happy to help you with that question about '{query}'. ",
+            "Let me share what I found in our company documents:\n"
+        ]
+        for i, c in enumerate(contexts, 1):
+            title = c.get("title", "Unknown Document")
+            sec = c.get("section") or "General Information"
+            lines.append(f"\n[{i}] From {title} ({sec}):")
+            text = c.get("text", "")
+            # Provide a more detailed summary
+            if len(text) > 500:
+                lines.append(text[:500] + "...")
+            else:
+                lines.append(text)
+        lines.append(
+            "\n\nBased on this information, here's what I can tell you: "
+            "The documents contain relevant details that should help answer your question. "
+            "For a more detailed and personalized response, please configure the OpenAI API key in your settings. "
+            "I'm here to help, so feel free to ask if you need clarification on any of these points!"
+        )
         return "\n".join(lines)
+
+    def generate_stream(self, query: str, contexts: List[Dict]):
+        """Stream version - yields the response word by word for effect"""
+        response = self.generate(query, contexts)
+        words = response.split(" ")
+        for i, word in enumerate(words):
+            yield word + (" " if i < len(words) - 1 else "")
 
 class OpenAILLM:
     def __init__(self, api_key: str):
@@ -104,16 +139,143 @@ class OpenAILLM:
         self.client = OpenAI(api_key=api_key)
 
     def generate(self, query: str, contexts: List[Dict]) -> str:
-        prompt = f"You are a helpful company policy assistant. Cite sources by title and section when relevant.\nQuestion: {query}\nSources:\n"
-        for c in contexts:
-            prompt += f"- {c.get('title')} | {c.get('section')}\n{c.get('text')[:600]}\n---\n"
-        prompt += "Write a concise, accurate answer grounded in the sources. If unsure, say so."
+        # Build context from retrieved chunks
+        context_text = ""
+        for i, c in enumerate(contexts, 1):
+            title = c.get('title', 'Unknown')
+            section = c.get('section', '')
+            text = c.get('text', '')[:800]  # Increased context window
+            context_text += f"\n[Source {i}]\nTitle: {title}\n"
+            if section:
+                context_text += f"Section: {section}\n"
+            context_text += f"Content: {text}\n---\n"
+        
+        system_message = """You are a friendly, knowledgeable, and talkative company policy assistant. Your role is to help employees understand company policies, products, and procedures in a warm and engaging way.
+
+CRITICAL INSTRUCTIONS:
+- DO NOT copy text verbatim from the source documents
+- DO NOT quote large chunks of text directly
+- Instead, PARAPHRASE, INTERPRET, and EXPLAIN the information in your own words
+- Synthesize the information from multiple sources into a cohesive, natural response
+- Think of yourself as a helpful colleague explaining policies to a friend - use your own words and explanations
+- Only use direct quotes sparingly and only for specific policy names, exact dates, or precise legal/technical terms that must be exact
+
+Guidelines for your responses:
+- Format your response using Markdown for better readability
+- Use headings (##, ###) to organize information
+- Use bullet points (- or *) for lists
+- Use **bold** for emphasis on important terms or key points
+- Use `code` formatting for specific policy names, product codes, or technical terms
+- Use numbered lists (1., 2., 3.) for step-by-step instructions
+- Be conversational, friendly, and enthusiastic
+- Provide detailed, comprehensive answers (not just brief summaries)
+- Explain things clearly and thoroughly, as if you're having a helpful conversation
+- Use natural language and be engaging - write as if you're explaining to a colleague
+- Synthesize information from the sources into your own explanation
+- Add helpful context, examples, and explanations to make the information more useful
+- Be proactive in providing related information that might be helpful
+- Use a warm, approachable tone throughout
+- When referencing sources, do so naturally (e.g., "According to our [Title] policy..." or "As outlined in [Title]...") but don't copy the text
+
+Remember: Your goal is to help the user understand the information, not to repeat the documents word-for-word. Explain, interpret, and synthesize the information in a natural, conversational way using Markdown formatting!"""
+
+        user_message = f"""User Question: {query}
+
+Relevant Information from Company Documents:
+{context_text}
+
+IMPORTANT: Use the information above as reference material, but DO NOT copy it verbatim. Instead:
+- Read and understand the information
+- Synthesize it into your own words
+- Explain it naturally as if you're a helpful colleague
+- Add context and examples where helpful
+- Make it conversational and easy to understand
+- Only quote exact terms, dates, or policy names when necessary
+
+Provide a detailed, friendly, and comprehensive answer that helps the user understand the information. Be thorough and conversational - explain things in your own words as if you're helping a colleague understand the policy or product."""
+        
         resp = self.client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.1
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.85,  # Higher temperature for more creative, interpretive responses
+            max_tokens=1200   # Allow for longer, more detailed responses
         )
         return resp.choices[0].message.content
+
+    def generate_stream(self, query: str, contexts: List[Dict]):
+        """Generator that yields chunks of the response as they're generated"""
+        # Build context from retrieved chunks
+        context_text = ""
+        for i, c in enumerate(contexts, 1):
+            title = c.get('title', 'Unknown')
+            section = c.get('section', '')
+            text = c.get('text', '')[:800]  # Increased context window
+            context_text += f"\n[Source {i}]\nTitle: {title}\n"
+            if section:
+                context_text += f"Section: {section}\n"
+            context_text += f"Content: {text}\n---\n"
+        
+        system_message = """You are a friendly, knowledgeable, and talkative company policy assistant. Your role is to help employees understand company policies, products, and procedures in a warm and engaging way.
+
+CRITICAL INSTRUCTIONS:
+- DO NOT copy text verbatim from the source documents
+- DO NOT quote large chunks of text directly
+- Instead, PARAPHRASE, INTERPRET, and EXPLAIN the information in your own words
+- Synthesize the information from multiple sources into a cohesive, natural response
+- Think of yourself as a helpful colleague explaining policies to a friend - use your own words and explanations
+- Only use direct quotes sparingly and only for specific policy names, exact dates, or precise legal/technical terms that must be exact
+
+Guidelines for your responses:
+- Format your response using Markdown for better readability
+- Use headings (##, ###) to organize information
+- Use bullet points (- or *) for lists
+- Use **bold** for emphasis on important terms or key points
+- Use `code` formatting for specific policy names, product codes, or technical terms
+- Use numbered lists (1., 2., 3.) for step-by-step instructions
+- Be conversational, friendly, and enthusiastic
+- Provide detailed, comprehensive answers (not just brief summaries)
+- Explain things clearly and thoroughly, as if you're having a helpful conversation
+- Use natural language and be engaging - write as if you're explaining to a colleague
+- Synthesize information from the sources into your own explanation
+- Add helpful context, examples, and explanations to make the information more useful
+- Be proactive in providing related information that might be helpful
+- Use a warm, approachable tone throughout
+- When referencing sources, do so naturally (e.g., "According to our [Title] policy..." or "As outlined in [Title]...") but don't copy the text
+
+Remember: Your goal is to help the user understand the information, not to repeat the documents word-for-word. Explain, interpret, and synthesize the information in a natural, conversational way using Markdown formatting!"""
+
+        user_message = f"""User Question: {query}
+
+Relevant Information from Company Documents:
+{context_text}
+
+IMPORTANT: Use the information above as reference material, but DO NOT copy it verbatim. Instead:
+- Read and understand the information
+- Synthesize it into your own words
+- Explain it naturally as if you're a helpful colleague
+- Add context and examples where helpful
+- Make it conversational and easy to understand
+- Only quote exact terms, dates, or policy names when necessary
+
+Provide a detailed, friendly, and comprehensive answer that helps the user understand the information. Be thorough and conversational - explain things in your own words as if you're helping a colleague understand the policy or product."""
+        
+        stream = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.85,
+            max_tokens=1200,
+            stream=True
+        )
+        
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
 
 # ---- RAG Orchestrator & Metrics ----
 class Metrics:
@@ -136,26 +298,36 @@ class Metrics:
         }
 
 class RAGEngine:
-    def __init__(self):
+    def __init__(self, collection: str = "policy_helper", dim: int = 384, url: str = "http://localhost:6333"):
         self.embedder = LocalEmbedder(dim=384)
         # Vector store selection
         if settings.vector_store == "qdrant":
             try:
-                self.store = QdrantStore(collection=settings.collection_name, dim=384)
-            except Exception:
+                self.store = QdrantStore(collection=settings.collection_name, dim=384, url=settings.qdrant_url)
+            except Exception as e:
+                print(f"Failed to connect to Qdrant at {settings.qdrant_url}: {e}")
                 self.store = InMemoryStore(dim=384)
         else:
             self.store = InMemoryStore(dim=384)
 
-        # LLM selection
-        if settings.llm_provider == "openai" and settings.openai_api_key:
+        # LLM selection - automatically use OpenAI if API key is provided
+        # (unless explicitly set to ollama)
+        if settings.llm_provider == "ollama":
+            # TODO: Implement Ollama LLM if needed
+            print("⚠ Ollama provider not yet implemented, using stub")
+            self.llm = StubLLM()
+            self.llm_name = "stub"
+        elif settings.openai_api_key:
             try:
                 self.llm = OpenAILLM(api_key=settings.openai_api_key)
                 self.llm_name = "openai:gpt-4o-mini"
-            except Exception:
+                print(f"✓ Using OpenAI LLM (gpt-4o-mini)")
+            except Exception as e:
+                print(f"⚠ Failed to initialize OpenAI LLM: {e}, falling back to stub")
                 self.llm = StubLLM()
                 self.llm_name = "stub"
         else:
+            print("⚠ No OpenAI API key found, using stub LLM")
             self.llm = StubLLM()
             self.llm_name = "stub"
 
@@ -192,6 +364,9 @@ class RAGEngine:
         qv = self.embedder.embed(query)
         results = self.store.search(qv, k=k)
         self.metrics.add_retrieval((time.time()-t0)*1000.0)
+        # Include score in metadata for filtering
+        for score, meta in results:
+            meta['_score'] = score
         return [meta for score, meta in results]
 
     def generate(self, query: str, contexts: List[Dict]) -> str:
@@ -199,6 +374,15 @@ class RAGEngine:
         answer = self.llm.generate(query, contexts)
         self.metrics.add_generation((time.time()-t0)*1000.0)
         return answer
+
+    def generate_stream(self, query: str, contexts: List[Dict]):
+        """Generator that streams the response as it's generated"""
+        if hasattr(self.llm, 'generate_stream'):
+            yield from self.llm.generate_stream(query, contexts)
+        else:
+            # Fallback: generate full response and yield it
+            answer = self.llm.generate(query, contexts)
+            yield answer
 
     def stats(self) -> Dict:
         m = self.metrics.summary()
