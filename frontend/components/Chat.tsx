@@ -174,29 +174,6 @@ export default function Chat() {
                             {...props}
                           />
                         ),
-                        code: ({
-                          node,
-                          className,
-                          children,
-                          ...props
-                        }: any) => {
-                          const isInline = !className;
-                          return isInline ? (
-                            <code
-                              className="bg-[#2a2a2a] px-1.5 py-0.5 rounded text-sm text-[#88ccff] font-mono"
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          ) : (
-                            <code
-                              className="block bg-[#1a1a1a] p-3 rounded-lg text-sm text-gray-300 font-mono overflow-x-auto mb-3 border border-[#2a2a2a]"
-                              {...props}
-                            >
-                              {children}
-                            </code>
-                          );
-                        },
                         blockquote: ({ node, ...props }) => (
                           <blockquote
                             className="border-l-4 border-[#4a4a4a] pl-4 my-3 text-gray-300 italic"
