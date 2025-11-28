@@ -1,4 +1,4 @@
-import time, os, math, json, hashlib
+import time, os, math, json, hashlib, re
 from typing import List, Dict, Tuple
 import numpy as np
 from .settings import settings
@@ -53,19 +53,36 @@ class InMemoryStore:
 
 class QdrantStore:
     def __init__(self, collection: str, dim: int = 384, url: str = "http://localhost:6333"):
-        self.client = QdrantClient(url=url, timeout=10.0)
         self.collection = collection
         self.dim = dim
+        self.url = url
+        print(f"🔌 Attempting to connect to Qdrant at {url}...")
+        try:
+            self.client = QdrantClient(url=url, timeout=10.0)
+            # Test connection by getting collections list
+            collections = self.client.get_collections()
+            print(f"✓ Successfully connected to Qdrant at {url}")
+            print(f"  Available collections: {[c.name for c in collections.collections]}")
+        except Exception as e:
+            print(f"❌ Failed to connect to Qdrant at {url}: {e}")
+            raise
         self._ensure_collection()
 
     def _ensure_collection(self):
         try:
-            self.client.get_collection(self.collection)
-        except Exception:
-            self.client.recreate_collection(
-                collection_name=self.collection,
-                vectors_config=qm.VectorParams(size=self.dim, distance=qm.Distance.COSINE)
-            )
+            collection_info = self.client.get_collection(self.collection)
+            print(f"✓ Collection '{self.collection}' exists with {collection_info.points_count} points")
+        except Exception as e:
+            print(f"⚠ Collection '{self.collection}' not found, creating it...")
+            try:
+                self.client.recreate_collection(
+                    collection_name=self.collection,
+                    vectors_config=qm.VectorParams(size=self.dim, distance=qm.Distance.COSINE)
+                )
+                print(f"✓ Created collection '{self.collection}' with dimension {self.dim}")
+            except Exception as create_error:
+                print(f"❌ Failed to create collection '{self.collection}': {create_error}")
+                raise
 
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
         points = []
@@ -88,12 +105,12 @@ class QdrantStore:
             points.append(qm.PointStruct(id=point_id, vector=v.tolist(), payload=m))
         self.client.upsert(collection_name=self.collection, points=points)
 
-    def search(self, query: np.ndarray, k: int = 1) -> List[Tuple[float, Dict]]:
+    def search(self, query: np.ndarray, k: int = 4) -> List[Tuple[float, Dict]]:
         res = self.client.search(
             collection_name=self.collection,
             query_vector=query.tolist(),
             limit=k,
-            score_threshold=0.9,
+            score_threshold=0.0,  # Lower threshold to allow more relevant results
             with_payload=True
         )
         out = []
@@ -104,34 +121,16 @@ class QdrantStore:
 # ---- LLM provider ----
 class StubLLM:
     def generate(self, query: str, contexts: List[Dict]) -> str:
-        lines = [
-            f"Hi! I'd be happy to help you with that question about '{query}'. ",
-            "Let me share what I found in our company documents:\n"
-        ]
-        for i, c in enumerate(contexts, 1):
-            title = c.get("title", "Unknown Document")
-            sec = c.get("section") or "General Information"
-            lines.append(f"\n[{i}] From {title} ({sec}):")
-            text = c.get("text", "")
-            # Provide a more detailed summary
-            if len(text) > 500:
-                lines.append(text[:500] + "...")
-            else:
-                lines.append(text)
-        lines.append(
-            "\n\nBased on this information, here's what I can tell you: "
-            "The documents contain relevant details that should help answer your question. "
-            "For a more detailed and personalized response, please configure the OpenAI API key in your settings. "
-            "I'm here to help, so feel free to ask if you need clarification on any of these points!"
-        )
+        lines = [f"Answer (stub): Based on the following sources:"]
+        for c in contexts:
+            sec = c.get("section") or "Section"
+            lines.append(f"- {c.get('title')} — {sec}")
+        lines.append("Summary:")
+        # naive summary of top contexts
+        joined = " ".join([c.get("text", "") for c in contexts])
+        lines.append(joined[:600] + ("..." if len(joined) > 600 else ""))
         return "\n".join(lines)
 
-    def generate_stream(self, query: str, contexts: List[Dict]):
-        """Stream version - yields the response word by word for effect"""
-        response = self.generate(query, contexts)
-        words = response.split(" ")
-        for i, word in enumerate(words):
-            yield word + (" " if i < len(words) - 1 else "")
 
 class OpenAILLM:
     def __init__(self, api_key: str):
@@ -153,12 +152,8 @@ class OpenAILLM:
         system_message = """You are a friendly, knowledgeable, and talkative company policy assistant. Your role is to help employees understand company policies, products, and procedures in a warm and engaging way.
 
 CRITICAL INSTRUCTIONS:
-- DO NOT copy text verbatim from the source documents
-- DO NOT quote large chunks of text directly
-- Instead, PARAPHRASE, INTERPRET, and EXPLAIN the information in your own words
-- Synthesize the information from multiple sources into a cohesive, natural response
-- Think of yourself as a helpful colleague explaining policies to a friend - use your own words and explanations
-- Only use direct quotes sparingly and only for specific policy names, exact dates, or precise legal/technical terms that must be exact
+- Only answer the question based on the information provided
+- If the question is not related to the information provided, say "I'm sorry, I can't answer that question."
 
 Guidelines for your responses:
 - Format your response using Markdown for better readability
@@ -185,6 +180,7 @@ Relevant Information from Company Documents:
 {context_text}
 
 IMPORTANT: Use the information above as reference material, but DO NOT copy it verbatim. Instead:
+- Don't just summarize the information, explain it in your own words
 - Read and understand the information
 - Synthesize it into your own words
 - Explain it naturally as if you're a helpful colleague
@@ -221,12 +217,8 @@ Provide a detailed, friendly, and comprehensive answer that helps the user under
         system_message = """You are a friendly, knowledgeable, and talkative company policy assistant. Your role is to help employees understand company policies, products, and procedures in a warm and engaging way.
 
 CRITICAL INSTRUCTIONS:
-- DO NOT copy text verbatim from the source documents
-- DO NOT quote large chunks of text directly
-- Instead, PARAPHRASE, INTERPRET, and EXPLAIN the information in your own words
-- Synthesize the information from multiple sources into a cohesive, natural response
-- Think of yourself as a helpful colleague explaining policies to a friend - use your own words and explanations
-- Only use direct quotes sparingly and only for specific policy names, exact dates, or precise legal/technical terms that must be exact
+- Only answer the question based on the information provided
+- If the question is not related to the information provided, say "I'm sorry, I can't answer that question."
 
 Guidelines for your responses:
 - Format your response using Markdown for better readability
@@ -261,14 +253,14 @@ IMPORTANT: Use the information above as reference material, but DO NOT copy it v
 - Only quote exact terms, dates, or policy names when necessary
 
 Provide a detailed, friendly, and comprehensive answer that helps the user understand the information. Be thorough and conversational - explain things in your own words as if you're helping a colleague understand the policy or product."""
-        
+        print(context_text,'context_text')
         stream = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": user_message}
             ],
-            temperature=0.85,
+            temperature=0.95,
             max_tokens=1200,
             stream=True
         )
@@ -303,11 +295,17 @@ class RAGEngine:
         # Vector store selection
         if settings.vector_store == "qdrant":
             try:
+                print(f"📦 Initializing Qdrant vector store...")
+                print(f"   Collection: {settings.collection_name}")
+                print(f"   URL: {settings.qdrant_url}")
                 self.store = QdrantStore(collection=settings.collection_name, dim=384, url=settings.qdrant_url)
+                print(f"✓ Qdrant vector store initialized successfully")
             except Exception as e:
-                print(f"Failed to connect to Qdrant at {settings.qdrant_url}: {e}")
+                print(f"❌ Failed to connect to Qdrant at {settings.qdrant_url}: {e}")
+                print(f"⚠ Falling back to in-memory vector store")
                 self.store = InMemoryStore(dim=384)
         else:
+            print(f"📦 Using in-memory vector store")
             self.store = InMemoryStore(dim=384)
 
         # LLM selection - automatically use OpenAI if API key is provided
@@ -363,6 +361,7 @@ class RAGEngine:
         t0 = time.time()
         qv = self.embedder.embed(query)
         results = self.store.search(qv, k=k)
+        print(results,'results')
         self.metrics.add_retrieval((time.time()-t0)*1000.0)
         # Include score in metadata for filtering
         for score, meta in results:
@@ -393,6 +392,99 @@ class RAGEngine:
             "llm_model": self.llm_name,
             **m
         }
+
+    def test_connection(self) -> Dict:
+        """Test the connection to the vector store"""
+        result = {
+            "vector_store_type": type(self.store).__name__,
+            "connected": False,
+            "error": None
+        }
+        
+        if isinstance(self.store, QdrantStore):
+            try:
+                # Try to get collections to test connection
+                collections = self.store.client.get_collections()
+                collection_info = self.store.client.get_collection(self.store.collection)
+                result["connected"] = True
+                result["url"] = self.store.url
+                result["collection"] = self.store.collection
+                result["points_count"] = collection_info.points_count
+                result["available_collections"] = [c.name for c in collections.collections]
+            except Exception as e:
+                result["error"] = str(e)
+        elif isinstance(self.store, InMemoryStore):
+            result["connected"] = True
+            result["points_count"] = len(self.store.vecs)
+        
+        return result
+
+    def rerank(self, query: str, contexts: List[Dict]) -> List[Dict]:
+        """Rerank the contexts based on the query using LLM"""
+        if not contexts:
+            return contexts
+        
+        # If using stub LLM, return contexts as-is
+        if isinstance(self.llm, StubLLM):
+            return contexts
+        
+        # Use LLM to rerank contexts
+        try:
+            # Build a prompt to score each context's relevance
+            context_texts = []
+            for i, ctx in enumerate(contexts):
+                title = ctx.get('title', 'Unknown')
+                section = ctx.get('section', '')
+                text = ctx.get('text', '')[:500]  # Limit text length
+                context_texts.append(f"[Context {i}]\nTitle: {title}\nSection: {section}\nText: {text}\n")
+            
+            prompt = f"""Given the following user query and a list of contexts, rank the contexts by their relevance to the query.
+
+User Query: {query}
+
+Contexts:
+{chr(10).join(context_texts)}
+
+Please return ONLY a JSON array of indices (0-based) representing the order of contexts from most relevant to least relevant. 
+For example, if Context 2 is most relevant, then Context 0, then Context 1, return: [2, 0, 1]
+
+Return only the JSON array, nothing else:"""
+            
+            # Use the LLM to generate the ranking
+            if hasattr(self.llm, 'client'):
+                # OpenAI LLM
+                response = self.llm.client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant that ranks document contexts by relevance. Always return a valid JSON array of indices."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.1,
+                    max_tokens=200
+                )
+                result_text = response.choices[0].message.content.strip()
+                
+                # Try to parse the JSON array from the response
+                # Extract JSON array from the response
+                json_match = re.search(r'\[[\d,\s]+\]', result_text)
+                if json_match:
+                    ranked_indices = json.loads(json_match.group())
+                    # Reorder contexts based on LLM ranking
+                    reranked = [contexts[i] for i in ranked_indices if 0 <= i < len(contexts)]
+                    # Add any contexts that weren't included in the ranking
+                    included = set(ranked_indices)
+                    for i, ctx in enumerate(contexts):
+                        if i not in included:
+                            reranked.append(ctx)
+                    return reranked
+            else:
+                # Fallback: return original order
+                return contexts
+        except Exception as e:
+            print(f"⚠ Error during reranking: {e}, returning original order")
+            return contexts
+        
+        return contexts
 
 # ---- Helpers ----
 def build_chunks_from_docs(docs: List[Dict], chunk_size: int, overlap: int) -> List[Dict]:

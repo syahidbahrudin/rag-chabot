@@ -114,8 +114,8 @@ export default function Chat() {
           {messages.map((m, i) => (
             <div
               key={i}
-              className={`group flex gap-4 mb-6 ${
-                m.role === "user" ? "justify-end" : "justify-start"
+              className={`group flex flex-col gap-2 mb-6 ${
+                m.role === "user" ? "items-end" : "items-start"
               }`}
             >
               <div
@@ -216,13 +216,16 @@ export default function Chat() {
                     {m.content}
                   </div>
                 )}
+              </div>
 
-                {m.citations && m.citations.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+              {m.role === "assistant" &&
+                m.citations &&
+                m.citations.length > 0 && (
+                  <div className="flex flex-wrap gap-2 max-w-[85%]">
                     {m.citations.map((c, idx) => (
                       <span
                         key={idx}
-                        className="bg-[#2a2a2a] text-gray-300 px-2 py-1 rounded-full text-xs border border-zinc-700"
+                        className="bg-[#2a2a2a] text-gray-300 px-3 py-1.5 rounded-full text-xs border border-zinc-700 font-medium"
                         title={c.section || ""}
                       >
                         {c.title}
@@ -230,7 +233,6 @@ export default function Chat() {
                     ))}
                   </div>
                 )}
-              </div>
             </div>
           ))}
 

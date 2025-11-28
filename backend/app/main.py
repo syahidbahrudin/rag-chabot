@@ -22,7 +22,12 @@ engine = RAGEngine()
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok"}
+    """Health check endpoint with vector store connection status"""
+    health_status = {
+        "status": "ok",
+        "vector_store": engine.test_connection()
+    }
+    return health_status
 
 @app.get("/api/metrics", response_model=MetricsResponse)
 def metrics():
@@ -78,7 +83,6 @@ def ask(req: AskRequest):
 def ask_stream(req: AskRequest):
     """Streaming endpoint for real-time responses"""
     ctx = engine.retrieve(req.query, k=req.k or 4)
-    
     # Filter and deduplicate citations by relevance score and title
     # Only include documents with similarity score above threshold (0.1 for cosine similarity)
     # and take top 3 most relevant unique documents
