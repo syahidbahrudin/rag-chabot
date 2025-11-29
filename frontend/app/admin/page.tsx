@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import { apiIngest, apiMetrics } from "../../lib/api";
+import Link from "next/link";
 
 interface Metrics {
   total_docs: number;
@@ -62,19 +63,14 @@ export default function AdminPage() {
     fetchMetrics();
   }, []);
 
-  // Auto-refresh metrics every 5 seconds if enabled
-  React.useEffect(() => {
-    if (!autoRefresh) return;
-
-    const interval = setInterval(() => {
-      fetchMetrics();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [autoRefresh]);
-
   return (
     <div className="min-h-screen bg-neutral-950 text-white p-8">
+      <Link
+        className="absolute top-3 right-3 text-white bg-neutral-800 px-4 py-2 rounded-md"
+        href="/"
+      >
+        Back to Chat
+      </Link>
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
@@ -93,7 +89,7 @@ export default function AdminPage() {
               className={`px-6 py-3 rounded-lg font-medium transition-all ${
                 isIngesting
                   ? "bg-neutral-800 text-neutral-500 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-neutral-600 hover:bg-neutral-700 text-white"
               }`}
             >
               {isIngesting ? (
@@ -138,15 +134,6 @@ export default function AdminPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">System Metrics</h2>
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                  className="rounded"
-                />
-                <span>Auto-refresh (5s)</span>
-              </label>
               <button
                 onClick={fetchMetrics}
                 disabled={isLoading}
