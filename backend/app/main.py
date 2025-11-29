@@ -8,6 +8,7 @@ from .settings import settings
 from .ingest import load_documents
 from .rag import RAGEngine, build_chunks_from_docs
 from .guardrails import is_greeting, get_greeting_response
+from .rerank import rerank
 
 app = FastAPI(title="AI Policy & Product Helper")
 
@@ -60,16 +61,17 @@ def ask(req: AskRequest):
         )
     
     ctx = engine.retrieve(req.query, k=req.k or 4)
+    # Rerank contexts to improve relevance
+    ctx = rerank(req.query, ctx)
     answer = engine.generate(req.query, ctx)
     
-    MIN_SCORE_THRESHOLD = 0.1
+    MIN_SCORE_THRESHOLD = 0.0  # Lower threshold to include more citations
     MAX_CITATIONS = 3
     
     scored_docs = []
     for c in ctx:
-        score = c.get('_score', 0.0)
-        if score >= MIN_SCORE_THRESHOLD:
-            scored_docs.append((score, c))
+        score = c.get('_score', 0.5)  # Default to 0.5 if score missing (likely after rerank)
+        scored_docs.append((score, c))
     
     scored_docs.sort(key=lambda x: x[0], reverse=True)
     
@@ -113,6 +115,8 @@ def ask_stream(req: AskRequest):
         return StreamingResponse(generate_greeting(), media_type="text/event-stream")
     
     ctx = engine.retrieve(req.query, k=req.k or 4)
+    # Rerank contexts to improve relevance
+    ctx = rerank(req.query, ctx)
     MIN_SCORE_THRESHOLD = 0.1
     MAX_CITATIONS = 3
     

@@ -140,5 +140,6 @@ Added packages for:
 - Show ingest logs
 - Connect to MCP
 - implement rerank
-
----
+- Support PDF, DOCX, and image ingestion (OCR)
+- Add query autocomplete
+- Support multiple LLM providers
