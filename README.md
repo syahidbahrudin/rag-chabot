@@ -1,9 +1,9 @@
 ---
 ---
 
-## 1 Backend Glow-Up
+## 1 Backend
 
-### RAG Engine Got a Whole Upgrade
+### RAG Engine
 
 - Qdrant connection? Now it actually tells you what's going on (with emojis).
 - If Qdrant is down, it doesn’t panic—just falls back to in-memory mode.
@@ -32,7 +32,7 @@
 
 ---
 
-## 2 Frontend Got a Major Glow-Up
+## 2 Frontend
 
 ### Chat UI Revamped
 
@@ -72,7 +72,7 @@ Added packages for:
 
 ---
 
-## 3 Infrastructure Upgrades
+## 3 Infrastructure
 
 ### Docker Setup
 
