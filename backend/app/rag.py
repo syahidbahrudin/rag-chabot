@@ -251,7 +251,6 @@ IMPORTANT: Use the information above as reference material, but DO NOT copy it v
 - Only quote exact terms, dates, or policy names when necessary
 
 Provide a detailed, friendly, and comprehensive answer that helps the user understand the information. Be thorough and conversational - explain things in your own words as if you're helping a colleague understand the policy or product."""
-        print(context_text,'context_text')
         stream = self.client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -341,7 +340,6 @@ class RAGEngine:
         t0 = time.time()
         qv = self.embedder.embed(query)
         results = self.store.search(qv, k=k)
-        print(results,'results')
         self.metrics.add_retrieval((time.time()-t0)*1000.0)
         for score, meta in results:
             meta['_score'] = score
