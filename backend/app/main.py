@@ -83,6 +83,7 @@ def ask(req: AskRequest):
 def ask_stream(req: AskRequest):
     """Streaming endpoint for real-time responses"""
     ctx = engine.retrieve(req.query, k=req.k or 4)
+    print(ctx,'ctx')
     # Filter and deduplicate citations by relevance score and title
     # Only include documents with similarity score above threshold (0.1 for cosine similarity)
     # and take top 3 most relevant unique documents

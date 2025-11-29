@@ -87,11 +87,9 @@ class QdrantStore:
     def upsert(self, vectors: List[np.ndarray], metadatas: List[Dict]):
         points = []
         for i, (v, m) in enumerate(zip(vectors, metadatas)):
-            # Qdrant requires point IDs to be either unsigned integers or UUIDs
-            # Convert hash string to integer if present, otherwise use index
             point_id = i
             if m.get("id"):
-                # Convert hex string to integer (use first 16 chars = 64 bits)
+
                 try:
                     point_id = int(m.get("id")[:16], 16)
                 except (ValueError, TypeError):
@@ -291,41 +289,31 @@ class Metrics:
 
 class RAGEngine:
     def __init__(self, collection: str = "policy_helper", dim: int = 384, url: str = "http://localhost:6333"):
+        print(settings.llm_provider,'settings.llm_provider')
+        print(settings.openai_api_key,'settings.openai_api_key')
+        print(settings.vector_store,'settings.vector_store')
+        print(settings.qdrant_url,'settings.qdrant_url')
+        print(settings.collection_name,'settings.collection_name')
+        print(settings.chunk_size,'settings.chunk_size')
+        print(settings.chunk_overlap,'settings.chunk_overlap')
+        print(settings.data_dir,'settings.data_dir')
         self.embedder = LocalEmbedder(dim=384)
-        # Vector store selection
         if settings.vector_store == "qdrant":
             try:
-                print(f"📦 Initializing Qdrant vector store...")
-                print(f"   Collection: {settings.collection_name}")
-                print(f"   URL: {settings.qdrant_url}")
                 self.store = QdrantStore(collection=settings.collection_name, dim=384, url=settings.qdrant_url)
-                print(f"✓ Qdrant vector store initialized successfully")
             except Exception as e:
-                print(f"❌ Failed to connect to Qdrant at {settings.qdrant_url}: {e}")
-                print(f"⚠ Falling back to in-memory vector store")
                 self.store = InMemoryStore(dim=384)
         else:
-            print(f"📦 Using in-memory vector store")
             self.store = InMemoryStore(dim=384)
 
-        # LLM selection - automatically use OpenAI if API key is provided
-        # (unless explicitly set to ollama)
-        if settings.llm_provider == "ollama":
-            # TODO: Implement Ollama LLM if needed
-            print("⚠ Ollama provider not yet implemented, using stub")
-            self.llm = StubLLM()
-            self.llm_name = "stub"
-        elif settings.openai_api_key:
+        if settings.llm_provider == "openai" and settings.openai_api_key:
             try:
                 self.llm = OpenAILLM(api_key=settings.openai_api_key)
                 self.llm_name = "openai:gpt-4o-mini"
-                print(f"✓ Using OpenAI LLM (gpt-4o-mini)")
-            except Exception as e:
-                print(f"⚠ Failed to initialize OpenAI LLM: {e}, falling back to stub")
+            except Exception:
                 self.llm = StubLLM()
                 self.llm_name = "stub"
         else:
-            print("⚠ No OpenAI API key found, using stub LLM")
             self.llm = StubLLM()
             self.llm_name = "stub"
 
@@ -363,7 +351,6 @@ class RAGEngine:
         results = self.store.search(qv, k=k)
         print(results,'results')
         self.metrics.add_retrieval((time.time()-t0)*1000.0)
-        # Include score in metadata for filtering
         for score, meta in results:
             meta['_score'] = score
         return [meta for score, meta in results]

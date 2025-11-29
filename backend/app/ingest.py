@@ -31,15 +31,6 @@ def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
     return chunks
 
 def load_documents(data_dir: str) -> List[Dict]:
-    if not os.path.exists(data_dir):
-        raise FileNotFoundError(
-            f"Data directory not found: {data_dir}. "
-            f"Please create the directory and add .md or .txt files, "
-            f"or set the DATA_DIR environment variable to point to your data directory."
-        )
-    if not os.path.isdir(data_dir):
-        raise ValueError(f"Data path is not a directory: {data_dir}")
-    
     docs = []
     for fname in sorted(os.listdir(data_dir)):
         if not fname.lower().endswith((".md", ".txt")):
