@@ -131,3 +131,12 @@ Added packages for:
 - Updated configs to match new architecture.
 
 ---
+
+---
+
+## 9 Future Improvement
+
+- Make multi modal input and output(file,audio,url)
+- Show ingest logs
+
+---
