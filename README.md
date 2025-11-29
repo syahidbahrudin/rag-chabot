@@ -1,35 +1,36 @@
 ---
+---
 
-#  Project Update: What Actually Changed (Human Version)
+# Project Update: What Actually Changed (Human Version)
 
 ## 1 Backend Glow-Up
 
 ### 🧠 RAG Engine Got a Whole Upgrade
 
-* Qdrant connection? Now it actually tells you what's going on (with emojis).
-* If Qdrant is down, it doesn’t panic—just falls back to in-memory mode.
-* Retrieving docs now includes `_score`, uses better filtering, and handles IDs properly.
-* Prompt system got a makeover: clearer instructions, friendly tone, markdown, bigger context window.
-* Added streaming support so answers pop in real-time.
+- Qdrant connection? Now it actually tells you what's going on (with emojis).
+- If Qdrant is down, it doesn’t panic—just falls back to in-memory mode.
+- Retrieving docs now includes `_score`, uses better filtering, and handles IDs properly.
+- Prompt system got a makeover: clearer instructions, friendly tone, markdown, bigger context window.
+- Added streaming support so answers pop in real-time.
 
 ### 🤖 LLM Integration
 
-* Prompt system is now way smarter + cleaner.
-* Temperature bumped up → responses feel more natural.
-* Added a `generate_stream()` method for real-time replies.
-* Bigger `max_tokens` for longer answers.
+- Prompt system is now way smarter + cleaner.
+- Temperature bumped up → responses feel more natural.
+- Added a `generate_stream()` method for real-time replies.
+- Bigger `max_tokens` for longer answers.
 
 ### 🌐 API Endpoints
 
-* `/api/ask/stream` → New streaming endpoint using SSE.
-* Better health check → now tells you if Qdrant is alive or dead.
-* Citation filtering improved so results aren’t messy.
+- `/api/ask/stream` → New streaming endpoint using SSE.
+- Better health check → now tells you if Qdrant is alive or dead.
+- Citation filtering improved so results aren’t messy.
 
 ### ⚙ Settings
 
-* `.env` actually loads now.
-* Added `QDRANT_URL` setting with smart defaults.
-* Default LLM provider is now OpenAI instead of that “stub” placeholder.
+- `.env` actually loads now.
+- Added `QDRANT_URL` setting with smart defaults.
+- Default LLM provider is now OpenAI instead of that “stub” placeholder.
 
 ---
 
