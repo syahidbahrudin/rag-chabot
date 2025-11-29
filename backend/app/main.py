@@ -46,7 +46,6 @@ def ask(req: AskRequest):
     ctx = engine.retrieve(req.query, k=req.k or 4)
     answer = engine.generate(req.query, ctx)
     
-    # Filter citations by relevance score (same logic as streaming endpoint)
     MIN_SCORE_THRESHOLD = 0.1
     MAX_CITATIONS = 3
     
@@ -83,24 +82,17 @@ def ask(req: AskRequest):
 def ask_stream(req: AskRequest):
     """Streaming endpoint for real-time responses"""
     ctx = engine.retrieve(req.query, k=req.k or 4)
-    print(ctx,'ctx')
-    # Filter and deduplicate citations by relevance score and title
-    # Only include documents with similarity score above threshold (0.1 for cosine similarity)
-    # and take top 3 most relevant unique documents
     MIN_SCORE_THRESHOLD = 0.1
     MAX_CITATIONS = 3
     
-    # Sort by score (highest first) and filter by threshold
     scored_docs = []
     for c in ctx:
         score = c.get('_score', 0.0)
         if score >= MIN_SCORE_THRESHOLD:
             scored_docs.append((score, c))
     
-    # Sort by score descending
     scored_docs.sort(key=lambda x: x[0], reverse=True)
     
-    # Deduplicate by title and take top N
     seen_titles = set()
     unique_citations = []
     for score, c in scored_docs:
@@ -113,16 +105,16 @@ def ask_stream(req: AskRequest):
             })
     
     def generate():
-        # Send metadata first
+
         yield f"data: {json.dumps({'type': 'metadata', 'citations': unique_citations})}\n\n"
         
-        # Stream the response
+
         full_text = ""
         for chunk in engine.generate_stream(req.query, ctx):
             full_text += chunk
             yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
         
-        # Send completion signal
+
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
     
     return StreamingResponse(generate(), media_type="text/event-stream")
