@@ -138,5 +138,7 @@ Added packages for:
 
 - Make multi modal input and output(file,audio,url)
 - Show ingest logs
+- Connect to MCP
+- implement rerank
 
 ---

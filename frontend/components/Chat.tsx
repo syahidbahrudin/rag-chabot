@@ -31,6 +31,7 @@ export default function Chat() {
     setIsSubmitting(true);
     const questionToSend = question || q;
     if (!questionToSend.trim()) {
+      setIsSubmitting(false);
       return;
     }
     const my = { role: "user" as const, content: questionToSend };
@@ -90,11 +91,13 @@ export default function Chat() {
         const newMessages = [...m];
         const lastMsg = newMessages[newMessages.length - 1];
         if (lastMsg.role === "assistant") {
-          lastMsg.content = "Error: " + e.message;
+          const errorMessage = e?.message || "An unexpected error occurred";
+          lastMsg.content = `Error: ${errorMessage}`;
         }
         return newMessages;
       });
       setLoading(false);
+      console.error("Error sending message:", e);
     } finally {
       setQ("");
       setIsSubmitting(false);

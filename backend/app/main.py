@@ -7,6 +7,7 @@ from .models import IngestResponse, AskRequest, AskResponse, MetricsResponse, Ci
 from .settings import settings
 from .ingest import load_documents
 from .rag import RAGEngine, build_chunks_from_docs
+from .guardrails import is_greeting, get_greeting_response
 
 app = FastAPI(title="AI Policy & Product Helper")
 
@@ -43,6 +44,21 @@ def ingest():
 
 @app.post("/api/ask", response_model=AskResponse)
 def ask(req: AskRequest):
+    # Guardrail: Check if the query is a greeting
+    if is_greeting(req.query):
+        greeting_response = get_greeting_response()
+        stats = engine.stats()
+        return AskResponse(
+            query=req.query,
+            answer=greeting_response,
+            citations=[],
+            chunks=[],
+            metrics={
+                "retrieval_ms": 0.0,
+                "generation_ms": 0.0,
+            }
+        )
+    
     ctx = engine.retrieve(req.query, k=req.k or 4)
     answer = engine.generate(req.query, ctx)
     
@@ -81,6 +97,21 @@ def ask(req: AskRequest):
 @app.post("/api/ask/stream")
 def ask_stream(req: AskRequest):
     """Streaming endpoint for real-time responses"""
+    # Guardrail: Check if the query is a greeting
+    if is_greeting(req.query):
+        greeting_response = get_greeting_response()
+        def generate_greeting():
+            # Send empty citations metadata
+            yield f"data: {json.dumps({'type': 'metadata', 'citations': []})}\n\n"
+            # Stream the greeting response in chunks to simulate streaming
+            words = greeting_response.split()
+            chunk_size = 3  # Send 3 words at a time
+            for i in range(0, len(words), chunk_size):
+                chunk = " ".join(words[i:i+chunk_size]) + " "
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+            yield f"data: {json.dumps({'type': 'done'})}\n\n"
+        return StreamingResponse(generate_greeting(), media_type="text/event-stream")
+    
     ctx = engine.retrieve(req.query, k=req.k or 4)
     MIN_SCORE_THRESHOLD = 0.1
     MAX_CITATIONS = 3
