@@ -289,14 +289,6 @@ class Metrics:
 
 class RAGEngine:
     def __init__(self, collection: str = "policy_helper", dim: int = 384, url: str = "http://localhost:6333"):
-        print(settings.llm_provider,'settings.llm_provider')
-        print(settings.openai_api_key,'settings.openai_api_key')
-        print(settings.vector_store,'settings.vector_store')
-        print(settings.qdrant_url,'settings.qdrant_url')
-        print(settings.collection_name,'settings.collection_name')
-        print(settings.chunk_size,'settings.chunk_size')
-        print(settings.chunk_overlap,'settings.chunk_overlap')
-        print(settings.data_dir,'settings.data_dir')
         self.embedder = LocalEmbedder(dim=384)
         if settings.vector_store == "qdrant":
             try:
