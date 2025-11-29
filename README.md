@@ -1,11 +1,9 @@
 ---
 ---
 
-# Project Update: What Actually Changed (Human Version)
-
 ## 1 Backend Glow-Up
 
-### 🧠 RAG Engine Got a Whole Upgrade
+### RAG Engine Got a Whole Upgrade
 
 - Qdrant connection? Now it actually tells you what's going on (with emojis).
 - If Qdrant is down, it doesn’t panic—just falls back to in-memory mode.
@@ -13,20 +11,20 @@
 - Prompt system got a makeover: clearer instructions, friendly tone, markdown, bigger context window.
 - Added streaming support so answers pop in real-time.
 
-### 🤖 LLM Integration
+### LLM Integration
 
 - Prompt system is now way smarter + cleaner.
 - Temperature bumped up → responses feel more natural.
 - Added a `generate_stream()` method for real-time replies.
 - Bigger `max_tokens` for longer answers.
 
-### 🌐 API Endpoints
+### API Endpoints
 
 - `/api/ask/stream` → New streaming endpoint using SSE.
 - Better health check → now tells you if Qdrant is alive or dead.
 - Citation filtering improved so results aren’t messy.
 
-### ⚙ Settings
+### Settings
 
 - `.env` actually loads now.
 - Added `QDRANT_URL` setting with smart defaults.
@@ -36,7 +34,7 @@
 
 ## 2 Frontend Got a Major Glow-Up
 
-### 💬 Chat UI Revamped
+### Chat UI Revamped
 
 New chat experience feels like an actual AI product:
 
@@ -47,24 +45,24 @@ New chat experience feels like an actual AI product:
 - Auto-scroll.
 - Better citations with expand/collapse.
 
-### 🛠 Admin Panel & New Admin Page
+### Admin Panel & New Admin Page
 
 - Cleaner UI, fixed position, dark theme.
 - A full `/admin` page with dashboards + metrics.
 - Shows doc counts, chunks, latency, models used, etc.
 
-### 🔌 API Client Changes
+### API Client Changes
 
 - Full SSE support with callbacks: `onChunk`, `onMetadata`, `onDone`.
 - Much cleaner error handling.
 
-### 🎨 Styling
+### Styling
 
 - Tailwind fully integrated.
 - PostCSS config added.
 - Old CSS basically retired.
 
-### 📦 Frontend Dependencies
+### Frontend Dependencies
 
 Added packages for:
 
@@ -76,7 +74,7 @@ Added packages for:
 
 ## 3 Infrastructure Upgrades
 
-### 🐳 Docker Setup
+### Docker Setup
 
 - Improved Qdrant healthcheck (actually checks if it’s alive).
 - Cleaner env variables.
@@ -133,23 +131,3 @@ Added packages for:
 - Updated configs to match new architecture.
 
 ---
-
-# 🚀 TL;DR (Ultra Human Version)
-
-You basically:
-
-- Turned the backend from “barely works” → “production-vibes.”
-- Upgraded UI from “basic chat box” → “modern AI assistant experience.”
-- Added sweet features like streaming, markdown, dashboard, citations.
-- Cleaned up Docker, configs, logging, and settings.
-- Reduced jank across the whole codebase.
-
-Everything still works with old endpoints, so no breaking stuff.
-
----
-
-If you want, I can also turn this into:
-✅ a changelog
-✅ a PR description
-✅ a README update
-Just say the word.
